@@ -860,6 +860,10 @@ func (ws *xlsxWorksheet) setPanes(panes *Panes) error {
 	}
 	if panes.Freeze {
 		p.State = "frozen"
+		if panes.Split {
+			// ST_PaneState: panes frozen after having been split.
+			p.State = "frozenSplit"
+		}
 	}
 	if ws.SheetViews == nil {
 		ws.SheetViews = &xlsxSheetViews{SheetView: []xlsxSheetView{{}}}
@@ -1031,8 +1035,20 @@ func (ws *xlsxWorksheet) getPanes() Panes {
 		return panes
 	}
 	panes.ActivePane = sw.Pane.ActivePane
-	if sw.Pane.State == "frozen" {
+	// ST_PaneState: "frozen" and "frozenSplit" are both frozen; "split" is
+	// split. A pane element with no state attribute is what SetPanes writes
+	// for a split, so a split offset without a state is treated as one too.
+	// Split was previously never assigned, so GetPanes reported it as false
+	// for every sheet and SetPanes(GetPanes(sheet)) silently dropped a split.
+	switch sw.Pane.State {
+	case "frozen":
 		panes.Freeze = true
+	case "frozenSplit":
+		panes.Freeze, panes.Split = true, true
+	case "split":
+		panes.Split = true
+	default:
+		panes.Split = sw.Pane.XSplit > 0 || sw.Pane.YSplit > 0
 	}
 	panes.TopLeftCell = sw.Pane.TopLeftCell
 	panes.XSplit = int(sw.Pane.XSplit)
