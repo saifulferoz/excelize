@@ -78,6 +78,9 @@ func TestPanes(t *testing.T) {
 	_, err = f.NewSheet("Panes 3")
 	assert.NoError(t, err)
 	assert.NoError(t, f.SetPanes("Panes 3", &panes3))
+	panes, err = f.GetPanes("Panes 3")
+	assert.NoError(t, err)
+	assert.Equal(t, panes3, panes)
 	ws, ok := f.Sheet.Load("xl/worksheets/sheet3.xml")
 	assert.True(t, ok)
 	ws.(*xlsxWorksheet).SheetViews.SheetView[0].Pane.State = "split"
