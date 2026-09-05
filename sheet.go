@@ -861,7 +861,6 @@ func (ws *xlsxWorksheet) setPanes(panes *Panes) error {
 	if panes.Freeze {
 		p.State = "frozen"
 		if panes.Split {
-			// ST_PaneState: panes frozen after having been split.
 			p.State = "frozenSplit"
 		}
 	}
@@ -1035,11 +1034,6 @@ func (ws *xlsxWorksheet) getPanes() Panes {
 		return panes
 	}
 	panes.ActivePane = sw.Pane.ActivePane
-	// ST_PaneState: "frozen" and "frozenSplit" are both frozen; "split" is
-	// split. A pane element with no state attribute is what SetPanes writes
-	// for a split, so a split offset without a state is treated as one too.
-	// Split was previously never assigned, so GetPanes reported it as false
-	// for every sheet and SetPanes(GetPanes(sheet)) silently dropped a split.
 	switch sw.Pane.State {
 	case "frozen":
 		panes.Freeze = true

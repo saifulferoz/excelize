@@ -45,7 +45,7 @@ func TestPanes(t *testing.T) {
 	_, err := f.NewSheet("Panes 2")
 	assert.NoError(t, err)
 
-	expected := Panes{
+	pane2 := Panes{
 		Freeze:      true,
 		Split:       false,
 		XSplit:      1,
@@ -56,29 +56,34 @@ func TestPanes(t *testing.T) {
 			{SQRef: "K16", ActiveCell: "K16", Pane: "topRight"},
 		},
 	}
-	assert.NoError(t, f.SetPanes("Panes 2", &expected))
+	assert.NoError(t, f.SetPanes("Panes 2", &pane2))
 	panes, err := f.GetPanes("Panes 2")
 	assert.NoError(t, err)
-	assert.Equal(t, expected, panes)
+	assert.Equal(t, pane2, panes)
 
+	panes3 := Panes{
+		Freeze:      false,
+		Split:       true,
+		XSplit:      3270,
+		YSplit:      1800,
+		TopLeftCell: "N57",
+		ActivePane:  "bottomLeft",
+		Selection: []Selection{
+			{SQRef: "I36", ActiveCell: "I36"},
+			{SQRef: "G33", ActiveCell: "G33", Pane: "topRight"},
+			{SQRef: "J60", ActiveCell: "J60", Pane: "bottomLeft"},
+			{SQRef: "O60", ActiveCell: "O60", Pane: "bottomRight"},
+		},
+	}
 	_, err = f.NewSheet("Panes 3")
 	assert.NoError(t, err)
 	assert.NoError(t, f.SetPanes("Panes 3",
-		&Panes{
-			Freeze:      false,
-			Split:       true,
-			XSplit:      3270,
-			YSplit:      1800,
-			TopLeftCell: "N57",
-			ActivePane:  "bottomLeft",
-			Selection: []Selection{
-				{SQRef: "I36", ActiveCell: "I36"},
-				{SQRef: "G33", ActiveCell: "G33", Pane: "topRight"},
-				{SQRef: "J60", ActiveCell: "J60", Pane: "bottomLeft"},
-				{SQRef: "O60", ActiveCell: "O60", Pane: "bottomRight"},
-			},
-		},
+		&panes3,
 	))
+	panes, err = f.GetPanes("Panes 3")
+	assert.NoError(t, err)
+	assert.Equal(t, panes3, panes)
+
 	_, err = f.NewSheet("Panes 4")
 	assert.NoError(t, err)
 	assert.NoError(t, f.SetPanes("Panes 4",
