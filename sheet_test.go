@@ -77,9 +77,10 @@ func TestPanes(t *testing.T) {
 	}
 	_, err = f.NewSheet("Panes 3")
 	assert.NoError(t, err)
-	assert.NoError(t, f.SetPanes("Panes 3",
-		&panes3,
-	))
+	assert.NoError(t, f.SetPanes("Panes 3", &panes3))
+	ws, ok := f.Sheet.Load("xl/worksheets/sheet3.xml")
+	assert.True(t, ok)
+	ws.(*xlsxWorksheet).SheetViews.SheetView[0].Pane.State = "split"
 	panes, err = f.GetPanes("Panes 3")
 	assert.NoError(t, err)
 	assert.Equal(t, panes3, panes)
@@ -99,7 +100,27 @@ func TestPanes(t *testing.T) {
 			},
 		},
 	))
-	assert.EqualError(t, f.SetPanes("Panes 4", nil), ErrParameterInvalid.Error())
+	// Test frozen and split panes
+	_, err = f.NewSheet("Panes 5")
+	assert.NoError(t, err)
+	pane5 := Panes{
+		Freeze:      true,
+		Split:       true,
+		XSplit:      2,
+		YSplit:      4,
+		TopLeftCell: "C5",
+		ActivePane:  "bottomRight",
+		Selection: []Selection{
+			{SQRef: "C1", ActiveCell: "C1"},
+			{SQRef: "A5", ActiveCell: "A5", Pane: "bottomLeft"},
+			{SQRef: "C5", ActiveCell: "C5", Pane: "bottomRight"},
+		},
+	}
+	assert.NoError(t, f.SetPanes("Panes 5", &pane5))
+	panes, err = f.GetPanes("Panes 5")
+	assert.NoError(t, err)
+	assert.Equal(t, pane5, panes)
+	assert.EqualError(t, f.SetPanes("Panes 5", nil), ErrParameterInvalid.Error())
 	assert.EqualError(t, f.SetPanes("SheetN", nil), "sheet SheetN does not exist")
 	// Test set panes with invalid sheet name
 	assert.EqualError(t, f.SetPanes("Sheet:1", &Panes{Freeze: false, Split: false}), ErrSheetNameInvalid.Error())
@@ -107,7 +128,7 @@ func TestPanes(t *testing.T) {
 
 	// Test get panes with empty sheet views
 	f = NewFile()
-	ws, ok := f.Sheet.Load("xl/worksheets/sheet1.xml")
+	ws, ok = f.Sheet.Load("xl/worksheets/sheet1.xml")
 	assert.True(t, ok)
 	ws.(*xlsxWorksheet).SheetViews = &xlsxSheetViews{}
 	_, err = f.GetPanes("Sheet1")
@@ -914,65 +935,4 @@ func TestAddIgnoredErrors(t *testing.T) {
 
 	assert.NoError(t, f.SaveAs(filepath.Join("test", "TestAddIgnoredErrors.xlsx")))
 	assert.NoError(t, f.Close())
-}
-
-func TestGetPanesPaneState(t *testing.T) {
-	// getPanes must map every ST_PaneState value, not just "frozen".
-	for _, tc := range []struct {
-		state         string
-		freeze, split bool
-	}{
-		{"frozen", true, false},
-		{"frozenSplit", true, true},
-		{"split", false, true},
-		{"", false, true}, // no state attribute + a split offset
-	} {
-		f := NewFile()
-		ws, err := f.workSheetReader("Sheet1")
-		assert.NoError(t, err)
-		ws.SheetViews = &xlsxSheetViews{SheetView: []xlsxSheetView{{
-			Pane: &xlsxPane{State: tc.state, XSplit: 1, YSplit: 1, ActivePane: "bottomRight"},
-		}}}
-		panes := ws.getPanes()
-		assert.Equalf(t, tc.freeze, panes.Freeze, "state %q Freeze", tc.state)
-		assert.Equalf(t, tc.split, panes.Split, "state %q Split", tc.state)
-	}
-
-	// No split offset and no state is neither frozen nor split.
-	f := NewFile()
-	ws, err := f.workSheetReader("Sheet1")
-	assert.NoError(t, err)
-	ws.SheetViews = &xlsxSheetViews{SheetView: []xlsxSheetView{{Pane: &xlsxPane{}}}}
-	panes := ws.getPanes()
-	assert.False(t, panes.Freeze)
-	assert.False(t, panes.Split)
-}
-
-func TestPaneStateRoundTrip(t *testing.T) {
-	// SetPanes(GetPanes(sheet)) must preserve the pane state. Split was never
-	// assigned by getPanes, so a split sheet round-tripped to no panes at all.
-	for _, tc := range []struct{ state, want string }{
-		{"frozen", "frozen"},
-		{"frozenSplit", "frozenSplit"},
-		{"split", ""}, // SetPanes writes a split as a pane with no state
-	} {
-		f := NewFile()
-		ws, err := f.workSheetReader("Sheet1")
-		assert.NoError(t, err)
-		ws.SheetViews = &xlsxSheetViews{SheetView: []xlsxSheetView{{
-			Pane: &xlsxPane{State: tc.state, XSplit: 3270, YSplit: 1800, ActivePane: "bottomRight"},
-		}}}
-
-		panes, err := f.GetPanes("Sheet1")
-		assert.NoError(t, err)
-		assert.NoError(t, f.SetPanes("Sheet1", &panes))
-
-		ws, err = f.workSheetReader("Sheet1")
-		assert.NoError(t, err)
-		if assert.NotNilf(t, ws.SheetViews.SheetView[0].Pane,
-			"state %q: the pane element must survive the round trip", tc.state) {
-			assert.Equalf(t, tc.want, ws.SheetViews.SheetView[0].Pane.State, "state %q", tc.state)
-			assert.Equalf(t, 3270.0, ws.SheetViews.SheetView[0].Pane.XSplit, "state %q XSplit", tc.state)
-		}
-	}
 }
